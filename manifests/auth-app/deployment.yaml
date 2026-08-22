@@ -1,0 +1,28 @@
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: auth-app, namespace: default }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: auth-app } }
+  template:
+    metadata: { labels: { app: auth-app } }
+    spec:
+      containers:
+        - name: auth-app
+          image: auth-app:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 3000 }]
+          env:
+            # The pod reaches the host's Postgres (on 5434) via host.k3d.internal,
+            # NOT localhost — inside a pod, localhost is the pod itself.
+            - name: DATABASE_URL
+              value: postgres://postgres:devpass@db:5432/app
+            - name: CLIENT_URL
+              value: http://localhost:3000
+            - name: ACCESS_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef: { name: auth-app-secrets, key: ACCESS_TOKEN_SECRET }
+            - name: REFRESH_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef: { name: auth-app-secrets, key: REFRESH_TOKEN_SECRET }
