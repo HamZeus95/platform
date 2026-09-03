@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
         - name: auth-app
-          image: ghcr.io/hamzeus95/auth-app:c0991e8c6d89211d37793f1423afa95f6c085ab9
+          image: ghcr.io/hamzeus95/auth-app:11a7a9ecd82822114749f2a8e1c035633d4dd949
           imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 3000 }]
           env:
