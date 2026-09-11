@@ -1,0 +1,91 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 90.0.0
+    helm:
+      releaseName: kube-prometheus-stack
+      values: |
+        # --- Talos: the control plane binds its metrics to 127.0.0.1, so these
+        # ServiceMonitors would scrape nothing and sit permanently DOWN, which
+        # is worse than not collecting them. Re-enabled once the machine config
+        # sets bind-address=0.0.0.0 for these components.
+        kubeControllerManager: { enabled: false }
+        kubeScheduler:         { enabled: false }
+        kubeProxy:             { enabled: false }
+        kubeEtcd:              { enabled: false }
+
+        prometheus:
+          prometheusSpec:
+            retention: 15d
+            # Without this, ServiceMonitors created outside the chart's release
+            # (ours) are ignored and nothing custom is ever scraped.
+            serviceMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            resources:
+              requests: { cpu: 100m, memory: 512Mi }
+              limits:   { memory: 2Gi }
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: local-path
+                  accessModes: [ReadWriteOnce]
+                  resources: { requests: { storage: 10Gi } }
+
+        alertmanager:
+          alertmanagerSpec:
+            storage:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: local-path
+                  accessModes: [ReadWriteOnce]
+                  resources: { requests: { storage: 2Gi } }
+
+        grafana:
+          admin:
+            existingSecret: grafana-admin
+            userKey: admin-user
+            passwordKey: admin-password
+          persistence:
+            enabled: true
+            storageClassName: local-path
+            size: 2Gi
+          # Reachable from any tailnet device with a Tailscale-issued cert.
+          ingress:
+            enabled: true
+            ingressClassName: tailscale
+            hosts: []
+            tls:
+              - hosts: [grafana]
+          grafana.ini:
+            server:
+              root_url: https://grafana.tailf46ba0.ts.net
+
+        # node-exporter needs hostPath/hostPID/hostNetwork, hence the
+        # privileged namespace label below.
+        nodeExporter: { enabled: true }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+        pod-security.kubernetes.io/audit: privileged
+        pod-security.kubernetes.io/warn: privileged
+    syncOptions:
+      - CreateNamespace=true
+      # the stack's CRDs (Prometheus, Alertmanager, ...) exceed the
+      # last-applied-configuration annotation limit
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: { duration: 15s, factor: 2, maxDuration: 5m }
