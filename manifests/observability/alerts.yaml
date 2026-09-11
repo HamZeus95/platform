@@ -1,0 +1,78 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: auth-app-rules
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: auth-app.availability
+      rules:
+        - alert: AuthAppTargetDown
+          expr: up{job="auth-app"} == 0
+          for: 2m
+          labels: { severity: critical, service: auth-app }
+          annotations:
+            summary: "auth-app is not being scraped"
+            description: >-
+              Prometheus cannot reach auth-app's metrics endpoint on
+              {{ $labels.instance }}. Either the pod is gone or :9464 stopped
+              serving. Check whether users are actually affected before paging.
+            runbook_url: https://github.com/HamZeus95/platform/blob/main/docs/runbooks/auth-app-target-down.md
+
+        - alert: AuthAppHighErrorRate
+          # 5xx only. A 401 is a rejected credential, not a service fault.
+          expr: >-
+            sum(rate(http_server_request_duration_count{service_name="auth-app",http_response_status_code=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(http_server_request_duration_count{service_name="auth-app"}[5m])), 0.001)
+            > 0.05
+          for: 5m
+          labels: { severity: critical, service: auth-app }
+          annotations:
+            summary: "auth-app 5xx rate above 5%"
+            description: "{{ $value | humanizePercentage }} of requests are returning 5xx."
+            runbook_url: https://github.com/HamZeus95/platform/blob/main/docs/runbooks/auth-app-high-error-rate.md
+
+        - alert: AuthAppHighLatency
+          expr: >-
+            histogram_quantile(0.95,
+              sum(rate(http_server_request_duration_bucket{service_name="auth-app"}[5m])) by (le)
+            ) > 1
+          for: 10m
+          labels: { severity: warning, service: auth-app }
+          annotations:
+            summary: "auth-app p95 latency above 1s"
+            description: "p95 is {{ $value | humanizeDuration }}."
+            runbook_url: https://github.com/HamZeus95/platform/blob/main/docs/runbooks/auth-app-high-error-rate.md
+
+    - name: auth-app.security
+      rules:
+        - alert: AuthAppLoginFailureSpike
+          # Tracked separately from the error rate on purpose: a burst of 401s
+          # is a credential-stuffing signal, not a service regression.
+          expr: >-
+            sum(rate(http_server_request_duration_count{service_name="auth-app",http_route="/auth/login",http_response_status_code="401"}[2m])) * 60
+            > 30
+          for: 1m
+          labels: { severity: warning, service: auth-app }
+          annotations:
+            summary: "Sustained burst of failed logins against auth-app"
+            description: "{{ $value | printf \"%.0f\" }} failed logins per minute over the last 2m."
+            runbook_url: https://github.com/HamZeus95/platform/blob/main/docs/runbooks/auth-app-login-failure-spike.md
+
+    - name: platform.storage
+      rules:
+        - alert: PersistentVolumeAlmostFull
+          # local-path is node-local with no replication, so a full volume is
+          # not recoverable by rescheduling.
+          expr: >-
+            kubelet_volume_stats_available_bytes
+            / kubelet_volume_stats_capacity_bytes < 0.15
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} is nearly full"
+            description: "Only {{ $value | humanizePercentage }} of the volume remains."
+            runbook_url: https://github.com/HamZeus95/platform/blob/main/docs/runbooks/persistent-volume-almost-full.md

@@ -1,0 +1,22 @@
+# Dashboards and alert rules live apart from the Helm releases they describe, so
+# they can be edited without re-rendering a chart.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability-config
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/HamZeus95/platform
+    path: manifests/observability
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [SkipDryRunOnMissingResource=true]
+    retry:
+      limit: 5
+      backoff: { duration: 10s, factor: 2, maxDuration: 2m }
