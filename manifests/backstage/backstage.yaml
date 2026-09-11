@@ -15,7 +15,10 @@ spec:
         - name: backstage
           image: ghcr.io/hamzeus95/backstage:latest
           imagePullPolicy: Always
-          args: ["--config", "app-config.yaml", "--config", "app-config.production.yaml"]
+          # No args override: the image's CMD is already
+          #   node packages/backend --config app-config.yaml --config app-config.production.yaml
+          # and the node base image's entrypoint re-execs whatever it is given,
+          # so overriding args produced "node: bad option: --config".
           env:
             - { name: POSTGRES_HOST, value: backstage-db }
             - { name: POSTGRES_PORT, value: "5432" }
