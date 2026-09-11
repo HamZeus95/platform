@@ -171,6 +171,8 @@ Recorded because each one cost real debugging time.
 - **[docs/AUDIT.md](docs/AUDIT.md)** — what has actually been verified, with
   evidence, plus an explicit list of limitations (node-local storage, single
   control plane, no backups).
+- **[docs/FIXES.md](docs/FIXES.md)** — every bug hit while building this, with
+  the real cause and the fix. Several are not specific to this homelab.
 - **[docs/runbooks/](docs/runbooks/)** — one per alert, linked from the alert's
   own `runbook_url`.
 
