@@ -1,0 +1,7 @@
+# never commit decrypted secrets or sealing keys
+*.key
+master.key
+*sealed-secrets-key*
+*.plain.json
+kubeconfig
+talosconfig
