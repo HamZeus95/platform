@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: keycloak-db-data, namespace: keycloak }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources: { requests: { storage: 5Gi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: keycloak-db, namespace: keycloak }
+spec:
+  replicas: 1
+  # RWO volume pinned to one node by WaitForFirstConsumer - a rolling update
+  # would put a second postgres on the same PGDATA.
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: keycloak-db } }
+  template:
+    metadata: { labels: { app: keycloak-db } }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          env:
+            - { name: POSTGRES_DB, value: keycloak }
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: keycloak-db, key: username } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: keycloak-db, key: password } }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports: [{ containerPort: 5432 }]
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "keycloak", "-d", "keycloak"] }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: keycloak-db-data }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: keycloak-db, namespace: keycloak }
+spec:
+  selector: { app: keycloak-db }
+  ports: [{ port: 5432, targetPort: 5432 }]

@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: keycloak, namespace: keycloak }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: keycloak } }
+  template:
+    metadata: { labels: { app: keycloak } }
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.4
+          # `start` (not start-dev): start-dev disables persistence guarantees
+          # and hostname checks and is explicitly unsupported for real use.
+          args: ["start"]
+          env:
+            - { name: KC_DB, value: postgres }
+            - { name: KC_DB_URL, value: "jdbc:postgresql://keycloak-db:5432/keycloak" }
+            - name: KC_DB_USERNAME
+              valueFrom: { secretKeyRef: { name: keycloak-db, key: username } }
+            - name: KC_DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: keycloak-db, key: password } }
+            # KC 26 renamed these from KEYCLOAK_ADMIN/_PASSWORD. They only seed
+            # the first admin on an empty database; later changes are ignored.
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom: { secretKeyRef: { name: keycloak-admin, key: username } }
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: keycloak-admin, key: password } }
+            # TLS is terminated by the Tailscale proxy in front, so Keycloak
+            # serves plain HTTP but must trust X-Forwarded-* to build correct
+            # issuer and redirect URLs - otherwise OIDC discovery advertises
+            # http:// and every login redirect breaks.
+            - { name: KC_HOSTNAME, value: "https://keycloak.tailf46ba0.ts.net" }
+            - { name: KC_HTTP_ENABLED, value: "true" }
+            - { name: KC_PROXY_HEADERS, value: "xforwarded" }
+            - { name: KC_HEALTH_ENABLED, value: "true" }
+            - { name: KC_METRICS_ENABLED, value: "true" }
+          ports:
+            - { containerPort: 8080, name: http }
+            - { containerPort: 9000, name: management }
+          # Health and metrics move to port 9000 in KC 25+, not 8080.
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 9000 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /health/live, port: 9000 }
+            initialDelaySeconds: 90
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 200m, memory: 768Mi }
+            limits: { memory: 1536Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: keycloak
+  labels: { app: keycloak }
+spec:
+  selector: { app: keycloak }
+  ports:
+    - { name: http, port: 80, targetPort: 8080 }
+    - { name: management, port: 9000, targetPort: 9000 }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  namespace: keycloak
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: keycloak
+      port: { number: 80 }
+  tls:
+    - hosts: [keycloak]
