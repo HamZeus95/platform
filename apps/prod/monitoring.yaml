@@ -95,7 +95,11 @@ spec:
               enabled: true
               name: Keycloak
               client_id: grafana
-              scopes: "openid profile email groups"
+              # NOT "groups": that would request a client scope of that name,
+              # which does not exist, and Keycloak fails the whole flow with
+              # invalid_scope. The groups claim comes from a protocol mapper on
+              # the client's dedicated scope, which is always applied.
+              scopes: "openid profile email"
               auth_url: https://keycloak.tailf46ba0.ts.net/realms/homelab/protocol/openid-connect/auth
               token_url: https://keycloak.tailf46ba0.ts.net/realms/homelab/protocol/openid-connect/token
               api_url: https://keycloak.tailf46ba0.ts.net/realms/homelab/protocol/openid-connect/userinfo
