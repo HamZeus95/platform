@@ -1,0 +1,21 @@
+apiVersion: platform.homelab.io/v1alpha1
+kind: XDatabase
+metadata:
+  name: demo
+spec:
+  size: small
+  storageGB: 2
+  databaseName: demoapp
+  namespace: default
+# ---
+# Apply this and Crossplane composes a PVC, Deployment, Service and a
+# credentials Secret (host/port/user/password/database/dsn):
+#
+#   kubectl --context prod apply -f docs/examples/xdatabase-demo.yaml
+#   kubectl --context prod get xdatabase demo
+#   kubectl --context prod get secret demo-db -o jsonpath='{.data.dsn}' | base64 -d
+#
+# Note: if you ever delete and recreate the XRD, restart the Crossplane
+# deployment. Its scope is immutable, so a scope change needs a recreate, and
+# the controller does not re-register for the new CRD on its own - the XR just
+# sits with no status at all, which looks like a broken Composition.
