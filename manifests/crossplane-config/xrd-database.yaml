@@ -1,12 +1,18 @@
 # A developer-facing API: "I want a database", not "here are 4 Kubernetes
-# objects". Namespaced (Crossplane v2), so a team creates one in its own
-# namespace and gets a Postgres plus its credentials Secret.
+# objects".
+#
+# Cluster-scoped, not Namespaced. Crossplane v2 only lets a namespaced
+# composite compose namespaced resources, and provider-kubernetes v0.18 ships
+# Object as cluster-scoped only:
+#   cannot apply cluster scoped composed resource "pvc" ... for a namespaced
+#   composite resource
+# So the target namespace is a spec field instead.
 apiVersion: apiextensions.crossplane.io/v2
 kind: CompositeResourceDefinition
 metadata:
   name: xdatabases.platform.homelab.io
 spec:
-  scope: Namespaced
+  scope: Cluster
   group: platform.homelab.io
   names:
     kind: XDatabase
@@ -38,6 +44,10 @@ spec:
                 databaseName:
                   type: string
                   default: app
+                namespace:
+                  type: string
+                  default: default
+                  description: Namespace the database objects are created in.
               required: []
             status:
               type: object
