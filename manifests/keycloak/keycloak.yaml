@@ -45,12 +45,15 @@ spec:
             - { containerPort: 9000, name: management }
           # Health and metrics move to port 9000 in KC 25+, not 8080.
           readinessProbe:
-            httpGet: { path: /health/ready, port: 9000 }
+            # scheme HTTPS: configuring KC_HTTPS_CERTIFICATE_FILE switches the
+            # management interface to TLS as well, so a plain HTTP probe fails
+            # and the pod never becomes Ready.
+            httpGet: { path: /health/ready, port: 9000, scheme: HTTPS }
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 30
           livenessProbe:
-            httpGet: { path: /health/live, port: 9000 }
+            httpGet: { path: /health/live, port: 9000, scheme: HTTPS }
             initialDelaySeconds: 90
             periodSeconds: 20
           volumeMounts:
