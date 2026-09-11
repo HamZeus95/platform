@@ -1,8 +1,23 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: db-data, namespace: default }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata: { name: db, namespace: default }
 spec:
   replicas: 1
+  # Recreate, NOT RollingUpdate: the PVC is ReadWriteOnce and local-path binds it
+  # to one node. A rolling update would schedule the new pod onto that same node
+  # while the old one still holds the data dir -> two postgres processes on one
+  # PGDATA. Recreate guarantees the old pod is gone first.
+  strategy: { type: Recreate }
   selector: { matchLabels: { app: db } }
   template:
     metadata: { labels: { app: db } }
@@ -13,7 +28,27 @@ spec:
           env:
             - { name: POSTGRES_PASSWORD, value: devpass }
             - { name: POSTGRES_DB, value: app }
+            # PGDATA must be a subdirectory of the mount, not the mount itself:
+            # postgres refuses to initdb into a non-empty dir, and some volume
+            # types drop lost+found at the mount root.
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
           ports: [{ containerPort: 5432 }]
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "postgres", "-d", "app"] }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec: { command: ["pg_isready", "-U", "postgres", "-d", "app"] }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: db-data }
 ---
 apiVersion: v1
 kind: Service
