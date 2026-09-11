@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: devns-operator, namespace: devns-operator }
+---
+# Deliberately narrow: the operator can create namespaces, quotas, limit ranges
+# and rolebindings, and nothing else. It notably cannot create Pods or read
+# Secrets, so a compromise of the controller is not a cluster takeover.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: { name: devns-operator }
+rules:
+  - apiGroups: [platform.homelab.io]
+    resources: [developernamespaces]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [platform.homelab.io]
+    resources: [developernamespaces/status, developernamespaces/finalizers]
+    verbs: [get, update, patch]
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, watch, create, update, patch]
+  - apiGroups: [""]
+    resources: [resourcequotas, limitranges]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [rolebindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Granting `edit`/`view`/`admin` to a team requires holding those rights, or
+  # the API server rejects the binding as privilege escalation.
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [clusterroles]
+    verbs: [bind]
+    resourceNames: [view, edit, admin]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [create, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: devns-operator }
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: devns-operator
+subjects:
+  - kind: ServiceAccount
+    name: devns-operator
+    namespace: devns-operator
