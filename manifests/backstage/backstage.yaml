@@ -33,15 +33,24 @@ spec:
             - name: KUBERNETES_SA_TOKEN
               valueFrom: { secretKeyRef: { name: backstage-sa-token, key: token } }
           ports: [{ containerPort: 7007, name: http }]
+          # A startupProbe, not a long initialDelay on liveness. Backstage runs
+          # database migrations for every plugin on first boot, which took
+          # longer than the liveness probe's 90s grace, so the kubelet killed
+          # it mid-migration in a loop. liveness only starts once this passes,
+          # and stays tight afterwards.
+          startupProbe:
+            httpGet: { path: /healthcheck, port: 7007 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 60      # up to 10 minutes to come up
           readinessProbe:
             httpGet: { path: /healthcheck, port: 7007 }
-            initialDelaySeconds: 30
             periodSeconds: 10
-            failureThreshold: 30
+            failureThreshold: 3
           livenessProbe:
             httpGet: { path: /healthcheck, port: 7007 }
-            initialDelaySeconds: 90
             periodSeconds: 20
+            failureThreshold: 3
           resources:
             requests: { cpu: 100m, memory: 512Mi }
             limits: { memory: 1536Mi }
