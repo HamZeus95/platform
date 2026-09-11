@@ -1,0 +1,16 @@
+# Prod only: the ServiceMonitor CRD only exists where kube-prometheus-stack is
+# installed, and dev runs neither Prometheus nor Tempo.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: auth-app
+  namespace: default
+spec:
+  selector:
+    matchLabels: { app: auth-app }
+  namespaceSelector:
+    matchNames: [default]
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s

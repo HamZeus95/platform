@@ -12,7 +12,11 @@ spec:
         - name: auth-app
           image: ghcr.io/hamzeus95/auth-app:placeholder
           imagePullPolicy: IfNotPresent
-          ports: [{ containerPort: 3000 }]
+          ports:
+            - { containerPort: 3000, name: http }
+            # OpenTelemetry metrics are served on their own port so /metrics is
+            # never reachable through the public ingress.
+            - { containerPort: 9464, name: metrics }
           readinessProbe:
             httpGet: { path: /health, port: 3000 }
             initialDelaySeconds: 5
@@ -25,6 +29,10 @@ spec:
             requests: { cpu: 50m, memory: 128Mi }
             limits: { memory: 512Mi }
           env:
+            - name: METRICS_PORT
+              value: "9464"
+            - name: OTEL_SERVICE_NAME
+              value: auth-app
             # The pod reaches the host's Postgres (on 5434) via host.k3d.internal,
             # NOT localhost — inside a pod, localhost is the pod itself.
             - name: DATABASE_URL

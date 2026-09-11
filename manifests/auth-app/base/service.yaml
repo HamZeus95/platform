@@ -1,7 +1,12 @@
 # service.yaml
 apiVersion: v1
 kind: Service
-metadata: { name: auth-app, namespace: default }
+metadata:
+  name: auth-app
+  namespace: default
+  labels: { app: auth-app }
 spec:
   selector: { app: auth-app }
-  ports: [{ port: 80, targetPort: 3000 }]
+  ports:
+    - { name: http, port: 80, targetPort: 3000 }
+    - { name: metrics, port: 9464, targetPort: metrics }

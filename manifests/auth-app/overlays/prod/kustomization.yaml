@@ -6,6 +6,7 @@ resources:
   - ingress.yaml
   - ingress-tailscale.yaml
   - seed-job.yaml
+  - servicemonitor.yaml
 patches:
   - target: { kind: Deployment, name: auth-app }
     patch: |-
@@ -14,6 +15,11 @@ patches:
         value:
           name: CLIENT_URL
           value: https://auth-app.tailf46ba0.ts.net
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://tempo.monitoring.svc.cluster.local:4318
 
 # Single source of truth for the image tag. CI rewrites newTag here, and the
 # transformer applies it to every container using this image name - the
