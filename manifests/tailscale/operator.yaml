@@ -6704,7 +6704,7 @@ spec:
           imagePullPolicy: Always
           env:
             - name: OPERATOR_INITIAL_TAGS
-              value: tag:k8s-operator
+              value: tag:k8s
             - name: OPERATOR_HOSTNAME
               value: tailscale-operator
             - name: OPERATOR_SECRET
