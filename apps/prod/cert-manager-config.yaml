@@ -1,0 +1,22 @@
+# Split from the cert-manager app so the CRDs and webhook are established
+# before any Issuer/Certificate is submitted to them.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-config
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/HamZeus95/platform
+    path: manifests/cert-manager-config
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [SkipDryRunOnMissingResource=true]
+    retry:
+      limit: 8
+      backoff: { duration: 10s, factor: 2, maxDuration: 3m }

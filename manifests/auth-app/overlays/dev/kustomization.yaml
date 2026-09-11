@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: default
+resources:
+  - ../../base
+patches:
+  # dev is reached through the k3d loadbalancer port mapping, not an ingress
+  - target: { kind: Deployment, name: auth-app }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CLIENT_URL
+          value: http://localhost:8088

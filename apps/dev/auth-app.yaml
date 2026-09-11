@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/HamZeus95/platform
-    path: manifests/auth-app
+    path: manifests/auth-app/overlays/dev
     targetRevision: main
   destination:
     server: https://kubernetes.default.svc
