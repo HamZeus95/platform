@@ -81,9 +81,35 @@ spec:
             hosts: []
             tls:
               - hosts: [grafana]
+          # Client secret arrives as an env var, which Grafana prefers over
+          # grafana.ini, so it never appears in the rendered config.
+          envValueFrom:
+            GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+              secretKeyRef:
+                name: grafana-oidc
+                key: client_secret
           grafana.ini:
             server:
               root_url: https://grafana.tailf46ba0.ts.net
+            auth.generic_oauth:
+              enabled: true
+              name: Keycloak
+              client_id: grafana
+              scopes: "openid profile email groups"
+              auth_url: https://keycloak.tailf46ba0.ts.net/realms/homelab/protocol/openid-connect/auth
+              token_url: https://keycloak.tailf46ba0.ts.net/realms/homelab/protocol/openid-connect/token
+              api_url: https://keycloak.tailf46ba0.ts.net/realms/homelab/protocol/openid-connect/userinfo
+              # Keycloak group -> Grafana role. Anyone who authenticates but is
+              # in no group gets Viewer, never Admin.
+              role_attribute_path: "contains(groups[*], 'platform-admins') && 'Admin' || 'Viewer'"
+              role_attribute_strict: false
+              allow_sign_up: true
+              use_pkce: true
+            auth:
+              # Keeps the local admin login usable as a break-glass path if
+              # Keycloak is down - locking yourself out of the dashboards
+              # during an incident is a real failure mode.
+              disable_login_form: false
           # Prometheus is wired up by the chart; Loki and Tempo are separate
           # releases so they have to be declared here.
           additionalDataSources:
