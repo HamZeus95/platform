@@ -51,11 +51,15 @@ spec:
             httpGet: { path: /health/ready, port: 9000, scheme: HTTPS }
             initialDelaySeconds: 30
             periodSeconds: 10
+            # The default 1s is not enough for a TLS handshake against a JVM;
+            # the probe timed out awaiting headers and the pod never went Ready.
+            timeoutSeconds: 5
             failureThreshold: 30
           livenessProbe:
             httpGet: { path: /health/live, port: 9000, scheme: HTTPS }
             initialDelaySeconds: 90
             periodSeconds: 20
+            timeoutSeconds: 5
           volumeMounts:
             - { name: tls, mountPath: /tls, readOnly: true }
           resources:
