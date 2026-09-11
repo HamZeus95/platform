@@ -108,8 +108,14 @@ spec:
               # the client's dedicated scope, which is always applied.
               scopes: "openid profile email"
               auth_url: https://keycloak.tailf46ba0.ts.net/realms/homelab/protocol/openid-connect/auth
-              token_url: https://keycloak.tailf46ba0.ts.net/realms/homelab/protocol/openid-connect/token
-              api_url: https://keycloak.tailf46ba0.ts.net/realms/homelab/protocol/openid-connect/userinfo
+              # auth_url is followed by the BROWSER, so it must be the public
+              # MagicDNS name. token_url and api_url are fetched by the Grafana
+              # process INSIDE the cluster, where CoreDNS cannot resolve a
+              # tailnet name at all:
+              #   lookup keycloak.tailf46ba0.ts.net on 10.96.0.10:53: no such host
+              # so those two use the in-cluster Service DNS instead.
+              token_url: http://keycloak.keycloak.svc.cluster.local/realms/homelab/protocol/openid-connect/token
+              api_url: http://keycloak.keycloak.svc.cluster.local/realms/homelab/protocol/openid-connect/userinfo
               # Keycloak group -> Grafana role. Anyone who authenticates but is
               # in no group gets Viewer, never Admin.
               role_attribute_path: "contains(groups[*], 'platform-admins') && 'Admin' || 'Viewer'"
