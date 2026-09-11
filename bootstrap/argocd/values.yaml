@@ -1,0 +1,49 @@
+# TLS is terminated by the Tailscale proxy in front, so argocd-server must not
+# redirect HTTP to HTTPS itself - otherwise the proxy and the server bounce the
+# browser between them forever.
+configs:
+  params:
+    server.insecure: true
+  cm:
+    url: https://argocd.tailf46ba0.ts.net
+    oidc.config: |
+      name: Keycloak
+      issuer: https://keycloak.tailf46ba0.ts.net/realms/homelab
+      clientID: argocd
+      clientSecret: $argocd-keycloak-oidc:oidc.keycloak.clientSecret
+      requestedScopes: ["openid", "profile", "email"]
+      rootCA: |
+        -----BEGIN CERTIFICATE-----
+        MIIBbjCCARSgAwIBAgIUIHikm3OMufzA9ZhLMQYFb1OcDK8wCgYIKoZIzj0EAwIw
+        FTETMBEGA1UEAxMKaG9tZWxhYi1jYTAeFw0yNjA5MTExMDUyMTZaFw0zNjA5MDgx
+        MDUyMTZaMBUxEzARBgNVBAMTCmhvbWVsYWItY2EwWTATBgcqhkjOPQIBBggqhkjO
+        PQMBBwNCAAQhKp8J66lvPB+yU0EFa7kX2sSlWxZ7K1omfFaruHVlv78NmiUSDqzl
+        EvDWziCEbChHX0QGBqVimpEZmIHNGZjqo0IwQDAOBgNVHQ8BAf8EBAMCAqQwDwYD
+        VR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUiQFE30Iu3mEjdlp+ecfQk3J5gZUwCgYI
+        KoZIzj0EAwIDSAAwRQIgRPLZM0b2mBqRSDw+TJ29KF3cWzbvQiae9xGSJJxVYegC
+        IQCakRVbYxzkphFiimvmGbVNSm/oeKK3+v1fI4kNeXBIvA==
+        -----END CERTIFICATE-----
+  rbac:
+    # Keycloak group -> ArgoCD role. Anyone else who authenticates lands on
+    # the default policy, which is read-only.
+    policy.default: role:readonly
+    policy.csv: |
+      g, platform-admins, role:admin
+      g, platform-viewers, role:readonly
+    scopes: "[groups, email]"
+# hostAliases lives under `global` in this chart, not under `server`.
+# ArgoCD resolves the OIDC issuer server-side, and CoreDNS cannot resolve a
+# tailnet name, so point it at the in-cluster Keycloak Service - which now
+# serves TLS for exactly that hostname.
+global:
+  hostAliases:
+    - ip: "10.106.1.69"
+      hostnames: ["keycloak.tailf46ba0.ts.net"]
+server:
+  ingress:
+    enabled: true
+    ingressClassName: tailscale
+    hostname: argocd
+    tls: true
+    extraTls:
+      - hosts: [argocd]
