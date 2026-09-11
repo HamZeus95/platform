@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tailscale-operator
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/HamZeus95/platform
+    path: manifests/tailscale
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tailscale
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      # the chart ships 8 CRDs; client-side apply blows the 262144-byte
+      # last-applied-configuration limit
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: { duration: 10s, factor: 2, maxDuration: 2m }
