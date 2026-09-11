@@ -1,0 +1,19 @@
+# Per-cluster root. Each cluster runs its own ArgoCD reading its own apps/ dir,
+# so cluster-specific apps (e.g. storage on prod) no longer leak across.
+# Apply once per cluster:  kubectl --context dev apply -f bootstrap/root-dev.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/HamZeus95/platform
+    path: apps/dev
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }

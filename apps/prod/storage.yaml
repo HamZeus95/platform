@@ -1,0 +1,20 @@
+# Prod only: Talos ships no storage provisioner.
+# Dev (k3d) already has a k3s-managed "local-path" StorageClass, so installing
+# this on dev would fight k3s's manifest deployer for ownership of the same
+# StorageClass name. Same class name on both clusters => identical PVC manifests.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: storage
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/HamZeus95/platform
+    path: manifests/storage/local-path-provisioner
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: local-path-storage
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
