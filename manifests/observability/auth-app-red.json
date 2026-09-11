@@ -112,7 +112,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -132,7 +133,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_server_request_duration_count{service_name=\"auth-app\",http_response_status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_request_duration_count{service_name=\"auth-app\"}[5m])), 0.001)",
+          "expr": "(sum(rate(http_server_request_duration_count{service_name=\"auth-app\",http_response_status_code=~\"5..\"}[5m])) or vector(0)) / clamp_min(sum(rate(http_server_request_duration_count{service_name=\"auth-app\"}[5m])), 0.001)",
           "instant": true,
           "datasource": {
             "type": "prometheus",
