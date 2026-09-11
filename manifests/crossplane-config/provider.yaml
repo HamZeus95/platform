@@ -1,0 +1,26 @@
+# provider-kubernetes lets a Composition create ordinary Kubernetes objects.
+# The alternative is a cloud provider, but the point here is to show the
+# composition machinery, not to rent an RDS instance.
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-kubernetes
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.18.0
+---
+# Crossplane v2 removed the legacy `resources` array from Composition; every
+# Composition is now a function pipeline. go-templating is the ergonomic choice
+# when one claim fans out into several resources.
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-go-templating
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.10.0
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-auto-ready
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-auto-ready:v0.5.0
