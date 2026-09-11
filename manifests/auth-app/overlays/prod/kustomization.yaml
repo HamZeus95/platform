@@ -20,4 +20,4 @@ patches:
 # Deployment and the seed hook - so they can never drift apart.
 images:
   - name: ghcr.io/hamzeus95/auth-app
-    newTag: 08a2252bdc5181e04c94bb783e34f0820f58a21f
+    newTag: 5e15c3d17ed00112c5a2d2896f1d5b9fe422dd1c
