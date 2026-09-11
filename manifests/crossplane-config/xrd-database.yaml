@@ -1,0 +1,47 @@
+# A developer-facing API: "I want a database", not "here are 4 Kubernetes
+# objects". Namespaced (Crossplane v2), so a team creates one in its own
+# namespace and gets a Postgres plus its credentials Secret.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xdatabases.platform.homelab.io
+spec:
+  scope: Namespaced
+  group: platform.homelab.io
+  names:
+    kind: XDatabase
+    plural: xdatabases
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                size:
+                  type: string
+                  enum: [small, medium]
+                  default: small
+                  description: >-
+                    small = 256Mi/50m, medium = 1Gi/200m. Deliberately a
+                    t-shirt size rather than raw requests, so the platform can
+                    change what "small" means without every team editing YAML.
+                storageGB:
+                  type: integer
+                  default: 5
+                  minimum: 1
+                  maximum: 50
+                databaseName:
+                  type: string
+                  default: app
+              required: []
+            status:
+              type: object
+              properties:
+                secretName:
+                  type: string
+                  description: Secret holding host, port, user, password and DSN.

@@ -1,0 +1,149 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xdatabase-postgres
+spec:
+  compositeTypeRef:
+    apiVersion: platform.homelab.io/v1alpha1
+    kind: XDatabase
+  mode: Pipeline
+  pipeline:
+    - step: render
+      functionRef: { name: function-go-templating }
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $xr := .observed.composite.resource }}
+            {{- $name := $xr.metadata.name }}
+            {{- $ns := $xr.metadata.namespace }}
+            {{- $db := default "app" $xr.spec.databaseName }}
+            {{- $size := default "small" $xr.spec.size }}
+            {{- $storage := default 5 $xr.spec.storageGB }}
+            {{- $cpu := "50m" }}{{- $mem := "256Mi" }}
+            {{- if eq $size "medium" }}{{- $cpu = "200m" }}{{- $mem = "1Gi" }}{{- end }}
+            {{- /*
+                 Password is derived deterministically from the composite's UID
+                 rather than randAlphaNum: a random value would be regenerated
+                 on every reconcile, rewriting the Secret and breaking the very
+                 database it just provisioned.
+            */ -}}
+            {{- $pw := (printf "%s-homelab-pg" $xr.metadata.uid) | sha256sum | trunc 24 }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              name: {{ $name }}-secret
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: secret
+            spec:
+              providerConfigRef: { name: default }
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Secret
+                  metadata:
+                    name: {{ $name }}-db
+                    namespace: {{ $ns }}
+                  stringData:
+                    host: {{ $name }}-db.{{ $ns }}.svc.cluster.local
+                    port: "5432"
+                    username: postgres
+                    password: {{ $pw }}
+                    database: {{ $db }}
+                    dsn: postgres://postgres:{{ $pw }}@{{ $name }}-db.{{ $ns }}.svc.cluster.local:5432/{{ $db }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              name: {{ $name }}-pvc
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: pvc
+            spec:
+              providerConfigRef: { name: default }
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: PersistentVolumeClaim
+                  metadata:
+                    name: {{ $name }}-db-data
+                    namespace: {{ $ns }}
+                  spec:
+                    accessModes: [ReadWriteOnce]
+                    storageClassName: local-path
+                    resources:
+                      requests:
+                        storage: {{ $storage }}Gi
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              name: {{ $name }}-deployment
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: deployment
+            spec:
+              providerConfigRef: { name: default }
+              forProvider:
+                manifest:
+                  apiVersion: apps/v1
+                  kind: Deployment
+                  metadata:
+                    name: {{ $name }}-db
+                    namespace: {{ $ns }}
+                  spec:
+                    replicas: 1
+                    strategy: { type: Recreate }
+                    selector:
+                      matchLabels: { app: {{ $name }}-db }
+                    template:
+                      metadata:
+                        labels: { app: {{ $name }}-db }
+                      spec:
+                        containers:
+                          - name: postgres
+                            image: postgres:16
+                            env:
+                              - { name: POSTGRES_DB, value: {{ $db }} }
+                              - { name: POSTGRES_PASSWORD, value: {{ $pw }} }
+                              - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+                            ports: [{ containerPort: 5432 }]
+                            volumeMounts:
+                              - { name: data, mountPath: /var/lib/postgresql/data }
+                            readinessProbe:
+                              exec: { command: ["pg_isready","-U","postgres","-d","{{ $db }}"] }
+                              initialDelaySeconds: 5
+                              periodSeconds: 10
+                            resources:
+                              requests: { cpu: {{ $cpu }}, memory: {{ $mem }} }
+                              limits: { memory: {{ $mem }} }
+                        volumes:
+                          - name: data
+                            persistentVolumeClaim: { claimName: {{ $name }}-db-data }
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              name: {{ $name }}-service
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: service
+            spec:
+              providerConfigRef: { name: default }
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Service
+                  metadata:
+                    name: {{ $name }}-db
+                    namespace: {{ $ns }}
+                  spec:
+                    selector: { app: {{ $name }}-db }
+                    ports: [{ port: 5432, targetPort: 5432 }]
+            ---
+            apiVersion: {{ $xr.apiVersion }}
+            kind: {{ $xr.kind }}
+            status:
+              secretName: {{ $name }}-db
+    - step: ready
+      functionRef: { name: function-auto-ready }
