@@ -66,6 +66,13 @@ spec:
                   resources: { requests: { storage: 2Gi } }
 
         grafana:
+          # Recreate, not the chart's default RollingUpdate. Grafana keeps its
+          # state in SQLite on an RWO local-path volume; local-path is
+          # node-local so both the old and new pod schedule onto the same node
+          # and BOTH mount it, producing "database is locked (SQLITE_BUSY)" and
+          # a stuck rollout. Same failure mode as Postgres in phase 0.
+          deploymentStrategy:
+            type: Recreate
           admin:
             existingSecret: grafana-admin
             userKey: admin-user
