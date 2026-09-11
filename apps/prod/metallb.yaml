@@ -1,0 +1,24 @@
+# Prod only: k3d ships klipper-lb (servicelb) which already serves
+# LoadBalancer Services, and Talos ships nothing.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metallb
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/HamZeus95/platform
+    path: manifests/metallb
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: metallb-system
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    # the pool CRs are in the same app as the CRDs that define them, so the
+    # client-side dry run has nothing to validate against on a first sync
+    syncOptions: [SkipDryRunOnMissingResource=true]
+    retry:
+      limit: 5
+      backoff: { duration: 10s, factor: 2, maxDuration: 2m }

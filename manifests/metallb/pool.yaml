@@ -1,0 +1,21 @@
+# sync-wave 1: the MetalLB validating webhook must be serving before these
+# custom resources are accepted, and the controller comes up in wave 0.
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: lan-pool
+  namespace: metallb-system
+  annotations: { argocd.argoproj.io/sync-wave: "1" }
+spec:
+  # Router DHCP pool is 192.168.1.100-253, so .2-.99 is static space.
+  addresses:
+    - 192.168.1.50-192.168.1.59
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: lan-l2
+  namespace: metallb-system
+  annotations: { argocd.argoproj.io/sync-wave: "1" }
+spec:
+  ipAddressPools: [lan-pool]
