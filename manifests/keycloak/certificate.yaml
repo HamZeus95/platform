@@ -1,0 +1,24 @@
+# Keycloak also serves HTTPS in-cluster under its PUBLIC hostname. ArgoCD does
+# OIDC discovery server-side and validates that the issuer it fetches matches
+# the issuer it was configured with, so it cannot simply use an internal URL
+# the way Grafana's token_url does. Giving Keycloak a cert that is valid for
+# keycloak.tailf46ba0.ts.net lets ArgoCD reach it by that exact name through a
+# hostAlias, with the issuer identical to what the browser sees.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: keycloak-tls
+  namespace: keycloak
+spec:
+  secretName: keycloak-tls
+  duration: 8760h
+  renewBefore: 720h
+  privateKey: { algorithm: ECDSA, size: 256 }
+  dnsNames:
+    - keycloak.tailf46ba0.ts.net
+    - keycloak.keycloak.svc.cluster.local
+    - keycloak
+  issuerRef:
+    name: homelab-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
