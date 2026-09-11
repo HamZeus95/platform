@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tempo
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: tempo
+    targetRevision: 1.24.4
+    helm:
+      releaseName: tempo
+      values: |
+        # Single binary Tempo with local block storage. Unlike Prometheus and
+        # Loki this needs no chown init container: the chart mounts the PVC at
+        # /var/tempo with no subPath, and local-path creates the volume root
+        # 0777, so uid 10001 can write to it directly. The Prometheus failure
+        # was caused by the kubelet-created subPath dir, not the volume root.
+        persistence:
+          enabled: true
+          storageClassName: local-path
+          size: 5Gi
+
+        tempo:
+          # OTLP only. The chart's defaults also open Jaeger and OpenCensus
+          # ports we have nothing emitting to.
+          receivers:
+            otlp:
+              protocols:
+                grpc:
+                  endpoint: "0.0.0.0:4317"
+                http:
+                  endpoint: "0.0.0.0:4318"
+          storage:
+            trace:
+              backend: local
+              local:
+                path: /var/tempo/traces
+              wal:
+                path: /var/tempo/wal
+          retention: 168h   # 7d
+          resources:
+            requests: { cpu: 50m, memory: 256Mi }
+            limits:   { memory: 1Gi }
+
+        serviceMonitor:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+    retry:
+      limit: 5
+      backoff: { duration: 15s, factor: 2, maxDuration: 5m }
