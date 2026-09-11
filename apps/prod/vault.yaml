@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://helm.releases.hashicorp.com
+    chart: vault
+    targetRevision: 0.34.1
+    helm:
+      releaseName: vault
+      values: |
+        # Standalone with the file storage backend on a local-path PVC.
+        # Not dev mode: dev mode keeps everything in memory and auto-unseals
+        # with a fixed root token, so it loses every secret on restart. This
+        # costs a manual unseal after each restart, which is the honest
+        # trade-off without a cloud KMS to auto-unseal against.
+        server:
+          standalone:
+            enabled: true
+            config: |
+              ui = true
+              # Talos enforces PodSecurity baseline, which forbids IPC_LOCK.
+              # Without disabling mlock Vault fails to start.
+              disable_mlock = true
+
+              listener "tcp" {
+                tls_disable     = 1
+                address         = "[::]:8200"
+                cluster_address = "[::]:8201"
+              }
+
+              storage "file" {
+                path = "/vault/data"
+              }
+          ha: { enabled: false }
+          dataStorage:
+            enabled: true
+            size: 5Gi
+            storageClass: local-path
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits:   { memory: 512Mi }
+        ui:
+          enabled: true
+        # The sidecar injector is a second way to deliver secrets; we use
+        # External Secrets Operator instead, so it is off.
+        injector:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]
+    retry:
+      limit: 5
+      backoff: { duration: 15s, factor: 2, maxDuration: 3m }
