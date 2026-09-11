@@ -5,6 +5,7 @@ resources:
   - ../../base
   - ingress.yaml
   - ingress-tailscale.yaml
+  - seed-job.yaml
 patches:
   - target: { kind: Deployment, name: auth-app }
     patch: |-
@@ -13,3 +14,10 @@ patches:
         value:
           name: CLIENT_URL
           value: https://auth-app.tailf46ba0.ts.net
+
+# Single source of truth for the image tag. CI rewrites newTag here, and the
+# transformer applies it to every container using this image name - the
+# Deployment and the seed hook - so they can never drift apart.
+images:
+  - name: ghcr.io/hamzeus95/auth-app
+    newTag: 08a2252bdc5181e04c94bb783e34f0820f58a21f

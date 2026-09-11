@@ -1,0 +1,38 @@
+# Runs after every successful sync. The app's migrate() creates the tables on
+# boot, but nothing ever created a user, so /auth/login correctly returned 401
+# against an empty users table. The seed is idempotent (ON CONFLICT DO UPDATE),
+# so re-running it just resets the demo passwords.
+#
+# The image tag is left as a placeholder on purpose: the overlay's `images:`
+# transformer rewrites it to the same tag the Deployment runs.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: auth-app-seed
+  namespace: default
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: seed
+          image: ghcr.io/hamzeus95/auth-app:placeholder
+          command: ["bun", "run", "server/dist/seed.js"]
+          env:
+            - name: DATABASE_URL
+              value: postgres://postgres:devpass@db:5432/app
+            # env.ts validates every required var at import time, so the seed
+            # fails to start without these even though it never signs a token.
+            - name: ACCESS_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef: { name: auth-app-secrets, key: ACCESS_TOKEN_SECRET }
+            - name: REFRESH_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef: { name: auth-app-secrets, key: REFRESH_TOKEN_SECRET }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
