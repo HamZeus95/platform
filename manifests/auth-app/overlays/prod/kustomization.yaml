@@ -4,6 +4,7 @@ namespace: default
 resources:
   - ../../base
   - ingress.yaml
+  - ingress-tailscale.yaml
 patches:
   - target: { kind: Deployment, name: auth-app }
     patch: |-
@@ -11,4 +12,4 @@ patches:
         path: /spec/template/spec/containers/0/env/-
         value:
           name: CLIENT_URL
-          value: https://auth.lab
+          value: https://auth-app.tailf46ba0.ts.net

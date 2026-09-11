@@ -1,0 +1,19 @@
+# Second ingress path, alongside the nginx/MetalLB one. The operator creates a
+# proxy that joins the tailnet as its own node, so this is reachable from any
+# device on the tailnet with a Tailscale-issued (publicly trusted) cert, with
+# no port forwarding and no LAN presence.
+# The name under tls.hosts becomes the MagicDNS name:
+#   auth-app.tailf46ba0.ts.net
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: auth-app-ts
+  namespace: default
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: auth-app
+      port: { number: 80 }
+  tls:
+    - hosts: [auth-app]
